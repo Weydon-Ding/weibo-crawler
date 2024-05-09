@@ -20,9 +20,9 @@ from pathlib import Path
 from time import sleep
 
 import requests
-from requests.exceptions import RequestException
 from lxml import etree
 from requests.adapters import HTTPAdapter
+from requests.exceptions import RequestException
 from tqdm import tqdm
 
 import const
@@ -215,7 +215,7 @@ class Weibo(object):
             return True
         except ValueError:
             return False
-    
+
     def is_date(self, since_date):
         """判断日期格式是否为 %Y-%m-%d"""
         try:
@@ -361,10 +361,10 @@ class Weibo(object):
         if self.long_sleep_count_before_each_user > 0:
             sleep_time = random.randint(30, 60)
             # 添加log，否则一般用户不知道以为程序卡了
-            logger.info(f"""短暂sleep {sleep_time}秒，避免被ban""")        
+            logger.info(f"""短暂sleep {sleep_time}秒，避免被ban""")
             sleep(sleep_time)
-            logger.info("sleep结束")  
-        self.long_sleep_count_before_each_user = self.long_sleep_count_before_each_user + 1      
+            logger.info("sleep结束")
+        self.long_sleep_count_before_each_user = self.long_sleep_count_before_each_user + 1
 
         js, status_code = self.get_json(params)
         if status_code != 200:
@@ -507,11 +507,11 @@ class Weibo(object):
             sqlite_exist = False
             if "sqlite" in self.write_mode:
                 sqlite_exist = self.sqlite_exist_file(file_path)
-                if not sqlite_exist: 
+                if not sqlite_exist:
                     need_download = True
 
             if not need_download:
-                return 
+                return
 
             s = requests.Session()
             s.mount(url, HTTPAdapter(max_retries=5))
@@ -533,7 +533,7 @@ class Weibo(object):
                     logger.debug("[DEBUG] success " + url + "  " + str(try_count))
                     break
 
-            if success: 
+            if success:
                 # 需要分别判断是否需要下载
                 if not file_exist:
                     with open(file_path, "wb") as f:
@@ -1107,7 +1107,6 @@ class Weibo(object):
             return True
         else:
             return False
-    
 
     def get_one_page(self, page):
         """获取一页的全部微博"""
@@ -1119,7 +1118,7 @@ class Weibo(object):
                 json.dump(js,f) #把列表numbers内容写入到"list.json"文件中
             if js["ok"]:
                 weibos = js["data"]["cards"]
-                
+
                 if self.query:
                     weibos = weibos[0]["card_group"]
                 # 如果需要检查cookie，在循环第一个人的时候，就要看看仅自己可见的信息有没有，要是没有直接报错
@@ -1230,7 +1229,7 @@ class Weibo(object):
                                 # self.print_weibo(wb)
                             else:
                                 logger.info("正在过滤转发微博")
-                    
+
                 if const.CHECK_COOKIE["CHECK"] and not const.CHECK_COOKIE["CHECKED"]:
                     logger.warning("经检查，cookie无效，系统退出")
                     if const.NOTIFY["NOTIFY"]:
@@ -1448,7 +1447,6 @@ class Weibo(object):
             logger.info(u'%d条微博通过POST发送到 %s', len(data['weibo']), self.post_config["api_url"])
         else:
             logger.info(u'没有获取到微博，略过API POST')
-
 
     def info_to_mongodb(self, collection, info_list):
         """将爬取的信息写入MongoDB数据库"""
@@ -1708,7 +1706,7 @@ class Weibo(object):
             sqlite_comment["text"] = re.sub('<[^<]+?>', '', comment["text"]).replace('\n', '').strip()
         else:
             sqlite_comment["text"] = comment["text"]
-        
+
         sqlite_comment["pic_url"] = ""
         if comment.get("pic"):
             sqlite_comment["pic_url"] = comment["pic"]["large"]["url"]
@@ -1889,7 +1887,7 @@ class Weibo(object):
                     id varchar(20) NOT NULL
                     ,bid varchar(20) NOT NULL
                     ,weibo_id varchar(32) NOT NULL
-                    ,root_id varchar(20) 
+                    ,root_id varchar(20)
                     ,user_id varchar(20) NOT NULL
                     ,created_at varchar(20)
                     ,user_screen_name varchar(64) NOT NULL
@@ -2013,7 +2011,7 @@ class Weibo(object):
         """获取文件中的微博id信息"""
         with open(file_path, "rb") as f:
             try:
-                lines = f.read().splitlines() 
+                lines = f.read().splitlines()
                 lines = [line.decode("utf-8-sig") for line in lines]
             except UnicodeDecodeError:
                 logger.error("%s文件应为utf-8编码，请先将文件编码转为utf-8再运行程序", file_path)
@@ -2039,7 +2037,7 @@ class Weibo(object):
                             sys.exit()
                     else:
                         user_config["since_date"] = self.since_date
-                    # 若超过3个字段，则第四个字段为 query_list                    
+                    # 若超过3个字段，则第四个字段为 query_list
                     if len(info) > 3:
                         user_config["query_list"] = info[3].split(",")
                     else:
