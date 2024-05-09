@@ -27,6 +27,7 @@ from tqdm import tqdm
 
 import const
 from database.mysql import MySQL
+from database.sqlite import Sqlite
 from util import csvutil
 from util.dateutil import convert_to_days_ago
 from util.notify import push_deer
@@ -94,6 +95,7 @@ class Weibo(object):
         cookie = config.get("cookie")  # 微博cookie，可填可不填
         user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.111 Safari/537.36"
         self.headers = {"User_Agent": user_agent, "Cookie": cookie}
+        self.sqlite = Sqlite()
         #self.mysql_config = config.get("mysql_config")  # MySQL数据库连接配置，可以不填
         self.mysql = MySQL(config.get("mysql_config"))
         self.mongodb_URI = config.get("mongodb_URI")  # MongoDB数据库连接字符串，可以不填
@@ -508,7 +510,7 @@ class Weibo(object):
             need_download = (not file_exist)
             sqlite_exist = False
             if "sqlite" in self.write_mode:
-                sqlite_exist = self.sqlite_exist_file(file_path)
+                sqlite_exist = self.sqlite.exist_file(file_path)
                 if not sqlite_exist:
                     need_download = True
 
@@ -554,20 +556,6 @@ class Weibo(object):
                 f.write(url.encode(sys.stdout.encoding))
             logger.exception(e)
 
-    def sqlite_exist_file(self, url):
-        if not os.path.exists(self.get_sqlte_path()):
-            return True
-        con = self.get_sqlite_connection()
-        cur = con.cursor()
-
-        query_sql = """SELECT url FROM bins WHERE path=? """
-        count = cur.execute(query_sql, (url,)).fetchone()
-        con.close()
-        if count is None:
-            return False
-
-        return True
-
     def insert_file_sqlite(self, file_path, weibo_id, url, binary):
         if not weibo_id:
             return
@@ -584,8 +572,8 @@ class Weibo(object):
         file_data["path"] = file_path
         file_data["url"] = url
 
-        con = self.get_sqlite_connection()
-        self.sqlite_insert(con, file_data, "bins")
+        con = self.sqlite.get_connection()
+        self.sqlite.insert(con, file_data, "bins")
         con.close()
 
     def handle_download(self, file_type, file_dir, urls, w):
@@ -1543,7 +1531,7 @@ class Weibo(object):
         logger.info("%d条微博写入MySQL数据库完毕", self.got_count)
 
     def weibo_to_sqlite(self, wrote_count):
-        con = self.get_sqlite_connection()
+        con = self.sqlite.get_connection()
         weibo_list = []
         retweet_list = []
         if len(self.write_mode) > 1:
@@ -1593,20 +1581,20 @@ class Weibo(object):
     def sqlite_insert_comments(self, weibo, comments):
         if not comments or len(comments) == 0:
             return
-        con = self.get_sqlite_connection()
+        con = self.sqlite.get_connection()
         for comment in comments:
             data = self.parse_sqlite_comment(comment, weibo)
-            self.sqlite_insert(con, data, "comments")
+            self.sqlite.insert(con, data, "comments")
 
         con.close()
 
     def sqlite_insert_reposts(self, weibo, reposts):
         if not reposts or len(reposts) == 0:
             return
-        con = self.get_sqlite_connection()
+        con = self.sqlite.get_connection()
         for repost in reposts:
             data = self.parse_sqlite_repost(repost, weibo)
-            self.sqlite_insert(con, data, "reposts")
+            self.sqlite.insert(con, data, "reposts")
 
         con.close()
 
@@ -1669,7 +1657,7 @@ class Weibo(object):
 
     def sqlite_insert_weibo(self, con: sqlite3.Connection, weibo: dict):
         sqlite_weibo = self.parse_sqlite_weibo(weibo)
-        self.sqlite_insert(con, sqlite_weibo, "weibo")
+        self.sqlite.insert(con, sqlite_weibo, "weibo")
 
     def parse_sqlite_weibo(self, weibo):
         if not weibo:
@@ -1695,13 +1683,13 @@ class Weibo(object):
         return sqlite_weibo
 
     def user_to_sqlite(self):
-        con = self.get_sqlite_connection()
+        con = self.sqlite.get_connection()
         self.sqlite_insert_user(con, self.user)
         con.close()
 
     def sqlite_insert_user(self, con: sqlite3.Connection, user: dict):
         sqlite_user = self.parse_sqlite_user(user)
-        self.sqlite_insert(con, sqlite_user, "user")
+        self.sqlite.insert(con, sqlite_user, "user")
 
     def parse_sqlite_user(self, user):
         if not user:
@@ -1721,121 +1709,6 @@ class Weibo(object):
         sqlite_user["avatar_url"] = user["avatar_hd"]
         sqlite_user["bio"] = user["description"]
         return sqlite_user
-
-    def sqlite_insert(self, con: sqlite3.Connection, data: dict, table: str):
-        if not data:
-            return
-        cur = con.cursor()
-        keys = ",".join(data.keys())
-        values = ",".join(["?"] * len(data))
-        sql = """INSERT OR REPLACE INTO {table}({keys}) VALUES({values})
-                """.format(
-            table=table, keys=keys, values=values
-        )
-        cur.execute(sql, list(data.values()))
-        con.commit()
-
-    def get_sqlite_connection(self):
-        path = self.get_sqlte_path()
-        create = False
-        if not os.path.exists(path):
-            create = True
-
-        con = sqlite3.connect(path)
-
-        if create == True:
-            self.create_sqlite_table(connection=con)
-
-        return con
-
-    def create_sqlite_table(self, connection: sqlite3.Connection):
-        sql = self.get_sqlite_create_sql()
-        cur = connection.cursor()
-        cur.executescript(sql)
-        connection.commit()
-
-    def get_sqlte_path(self):
-        return "./weibo/weibodata.db"
-
-    def get_sqlite_create_sql(self):
-        create_sql = """
-                CREATE TABLE IF NOT EXISTS user (
-                    id varchar(64) NOT NULL
-                    ,nick_name varchar(64) NOT NULL
-                    ,gender varchar(6)
-                    ,follower_count integer
-                    ,follow_count integer
-                    ,birthday varchar(10)
-                    ,location varchar(32)
-                    ,edu varchar(32)
-                    ,company varchar(32)
-                    ,reg_date DATETIME
-                    ,main_page_url text
-                    ,avatar_url text
-                    ,bio text
-                    ,PRIMARY KEY (id)
-                );
-
-                CREATE TABLE IF NOT EXISTS weibo (
-                    id varchar(20) NOT NULL
-                    ,bid varchar(12) NOT NULL
-                    ,user_id varchar(20)
-                    ,screen_name varchar(30)
-                    ,text varchar(2000)
-                    ,article_url varchar(100)
-                    ,topics varchar(200)
-                    ,at_users varchar(1000)
-                    ,pics varchar(3000)
-                    ,video_url varchar(1000)
-                    ,location varchar(100)
-                    ,created_at DATETIME
-                    ,source varchar(30)
-                    ,attitudes_count INT
-                    ,comments_count INT
-                    ,reposts_count INT
-                    ,retweet_id varchar(20)
-                    ,PRIMARY KEY (id)
-                );
-
-                CREATE TABLE IF NOT EXISTS bins (
-                    id integer PRIMARY KEY AUTOINCREMENT
-                    ,ext varchar(10) NOT NULL /*file extension*/
-                    ,data blob NOT NULL
-                    ,weibo_id varchar(20)
-                    ,comment_id varchar(20)
-                    ,path text
-                    ,url text
-                );
-
-                CREATE TABLE IF NOT EXISTS comments (
-                    id varchar(20) NOT NULL
-                    ,bid varchar(20) NOT NULL
-                    ,weibo_id varchar(32) NOT NULL
-                    ,root_id varchar(20)
-                    ,user_id varchar(20) NOT NULL
-                    ,created_at varchar(20)
-                    ,user_screen_name varchar(64) NOT NULL
-                    ,user_avatar_url text
-                    ,text varchar(1000)
-                    ,pic_url text
-                    ,like_count integer
-                    ,PRIMARY KEY (id)
-                );
-
-                CREATE TABLE IF NOT EXISTS reposts (
-                    id varchar(20) NOT NULL
-                    ,bid varchar(20) NOT NULL
-                    ,weibo_id varchar(32) NOT NULL
-                    ,user_id varchar(20) NOT NULL
-                    ,created_at varchar(20)
-                    ,user_screen_name varchar(64) NOT NULL
-                    ,user_avatar_url text
-                    ,text varchar(1000)
-                    ,like_count integer
-                    ,PRIMARY KEY (id)
-                );
-                """
-        return create_sql
 
     def update_user_config_file(self, user_config_file_path):
         """更新用户配置文件"""
