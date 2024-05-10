@@ -26,6 +26,7 @@ from requests.exceptions import RequestException
 from tqdm import tqdm
 
 import const
+import util
 from database.mysql import MySQL
 from database.sqlite import Sqlite
 from util import csvutil
@@ -57,9 +58,9 @@ class Weibo(object):
         if isinstance(since_date, int):
             since_date = date.today() - timedelta(since_date)
             since_date = since_date.strftime(DTFORMAT)
-        elif self.is_date(since_date):
+        elif util.is_date(since_date):
             since_date = "{}T00:00:00".format(since_date)
-        elif self.is_datetime(since_date):
+        elif util.is_datetime(since_date):
             pass
         else:
             logger.error("since_date 格式不正确，请确认配置是否正确")
@@ -192,7 +193,7 @@ class Weibo(object):
 
         # 验证since_date
         since_date = config["since_date"]
-        if (not isinstance(since_date, int)) and (not self.is_datetime(since_date)) and (not self.is_date(since_date)):
+        if (not isinstance(since_date, int)) and (not util.is_datetime(since_date)) and (not util.is_date(since_date)):
             logger.warning("since_date值应为yyyy-mm-dd形式、yyyy-mm-ddTHH:MM:SS形式或整数，请重新输入")
             sys.exit()
 
@@ -211,22 +212,6 @@ class Weibo(object):
         elif repost_max_count < 0:
             logger.warning("最大下载转发数 (repost_max_download_count) 应该为正整数")
             sys.exit()
-
-    def is_datetime(self, since_date):
-        """判断日期格式是否为 %Y-%m-%dT%H:%M:%S"""
-        try:
-            datetime.strptime(since_date, DTFORMAT)
-            return True
-        except ValueError:
-            return False
-
-    def is_date(self, since_date):
-        """判断日期格式是否为 %Y-%m-%d"""
-        try:
-            datetime.strptime(since_date, "%Y-%m-%d")
-            return True
-        except ValueError:
-            return False
 
     def get_json(self, params):
         """获取网页中json数据"""
@@ -1352,7 +1337,6 @@ class Weibo(object):
                     writer.writerows([headers])
                 writer.writerows(result_data)
         else:  # python3.x
-
             with open(file_path, "a", encoding="utf-8-sig", newline="") as f:
                 writer = csv.writer(f)
                 if is_first_write:
@@ -1822,9 +1806,9 @@ class Weibo(object):
                     user_config["user_id"] = info[0]
                     # 根据配置文件行的字段数确定 since_date 的值
                     if len(info) == 3:
-                        if self.is_datetime(info[2]):
+                        if util.is_datetime(info[2]):
                             user_config["since_date"] = info[2]
-                        elif self.is_date(info[2]):
+                        elif util.is_date(info[2]):
                             user_config["since_date"] = "{}T00:00:00".format(info[2])
                         elif info[2].isdigit():
                             since_date = date.today() - timedelta(int(info[2]))
