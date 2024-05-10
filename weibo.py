@@ -88,9 +88,7 @@ class WeiboCrawler(object):
         """Weibo类初始化"""
         self.validate_config(config)
         self.only_crawl_original = config["only_crawl_original"]  # 取值范围为0、1,程序默认值为0,代表要爬取用户的全部微博,1代表只爬取用户的原创微博
-        self.remove_html_tag = config[
-            "remove_html_tag"
-        ]  # 取值范围为0、1, 0代表不移除微博中的html tag, 1代表移除
+        self.remove_html_tag = config["remove_html_tag"]  # 取值范围为0、1, 0代表不移除微博中的html tag, 1代表移除
         since_date = config["since_date"]
         # since_date 若为整数，则取该天数之前的日期；若为 yyyy-mm-dd，则增加时间
         if isinstance(since_date, int):
@@ -105,38 +103,21 @@ class WeiboCrawler(object):
             sys.exit()
         self.since_date = since_date  # 起始时间，即爬取发布日期从该值到现在的微博，形式为yyyy-mm-ddThh:mm:ss，如：2023-08-21T09:23:03
         self.start_page = config.get("start_page", 1)  # 开始爬的页，如果中途被限制而结束可以用此定义开始页码
-        self.write_mode = config[
-            "write_mode"
-        ]  # 结果信息保存类型，为list形式，可包含csv、mongo和mysql三种类型
-        self.original_pic_download = config[
-            "original_pic_download"
-        ]  # 取值范围为0、1, 0代表不下载原创微博图片,1代表下载
-        self.retweet_pic_download = config[
-            "retweet_pic_download"
-        ]  # 取值范围为0、1, 0代表不下载转发微博图片,1代表下载
-        self.original_video_download = config[
-            "original_video_download"
-        ]  # 取值范围为0、1, 0代表不下载原创微博视频,1代表下载
-        self.retweet_video_download = config[
-            "retweet_video_download"
-        ]  # 取值范围为0、1, 0代表不下载转发微博视频,1代表下载
+        self.write_mode = config["write_mode"]  # 结果信息保存类型，为list形式，可包含csv、mongo和mysql三种类型
+        self.original_pic_download = config["original_pic_download"]  # 取值范围为0、1, 0代表不下载原创微博图片,1代表下载
+        self.retweet_pic_download = config["retweet_pic_download"]  # 取值范围为0、1, 0代表不下载转发微博图片,1代表下载
+        self.original_video_download = config["original_video_download"]  # 取值范围为0、1, 0代表不下载原创微博视频,1代表下载
+        self.retweet_video_download = config["retweet_video_download"]  # 取值范围为0、1, 0代表不下载转发微博视频,1代表下载
         self.download_comment = config["download_comment"]  # 1代表下载评论,0代表不下载
-        self.comment_max_download_count = config[
-            "comment_max_download_count"
-        ]  # 如果设置了下评论，每条微博评论数会限制在这个值内
+        self.comment_max_download_count = config["comment_max_download_count"]  # 如果设置了下评论，每条微博评论数会限制在这个值内
         self.download_repost = config["download_repost"]  # 1代表下载转发,0代表不下载
-        self.repost_max_download_count = config[
-            "repost_max_download_count"
-        ]  # 如果设置了下转发，每条微博转发数会限制在这个值内
-        self.user_id_as_folder_name = config.get(
-            "user_id_as_folder_name", 0
-        )  # 结果目录名，取值为0或1，决定结果文件存储在用户昵称文件夹里还是用户id文件夹里
+        self.repost_max_download_count = config["repost_max_download_count"]  # 如果设置了下转发，每条微博转发数会限制在这个值内
+        self.user_id_as_folder_name = config.get("user_id_as_folder_name", 0)  # 结果目录名，取值为0或1，决定结果文件存储在用户昵称文件夹里还是用户id文件夹里
         cookie = config.get("cookie")  # 微博cookie，可填可不填
         user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.111 Safari/537.36"
         self.headers = {"User_Agent": user_agent, "Cookie": cookie}
         self.sqlite = Sqlite()
-        #self.mysql_config = config.get("mysql_config")  # MySQL数据库连接配置，可以不填
-        self.mysql = MySQL(config.get("mysql_config"))
+        self.mysql = MySQL(config.get("mysql_config"))  # MySQL数据库连接配置，可以不填
         self.mongodb_URI = config.get("mongodb_URI")  # MongoDB数据库连接字符串，可以不填
         self.post_config = config.get("post_config")  # post_config，可以不填
         user_id_list = config["user_id_list"]
