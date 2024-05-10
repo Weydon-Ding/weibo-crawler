@@ -45,7 +45,45 @@ logger = logging.getLogger("weibo")
 # 日期时间格式
 DTFORMAT = "%Y-%m-%dT%H:%M:%S"
 
+
 class Weibo(object):
+    def __init__(self, weibo):
+        self.weibo = weibo
+        self.retweet = None
+        if self.weibo.get("retweet"):
+            self.retweet = Weibo(self.weibo["retweet"])
+
+    def print_one_weibo(self) -> str:
+        """打印一条微博"""
+        info = f'微博id：{self.weibo["id"]}\n'
+        info += f'微博正文：{self.weibo["text"]}\n'
+        info += f'原始图片url：{self.weibo["pics"]}\n'
+        info += f'微博位置：{self.weibo["location"]}\n'
+        info += f'发布时间：{self.weibo["created_at"]}\n'
+        info += f'发布工具：{self.weibo["source"]}\n'
+        info += f'点赞数：{self.weibo["attitudes_count"]}\n'
+        info += f'评论数：{self.weibo["comments_count"]}\n'
+        info += f'转发数：{self.weibo["reposts_count"]}\n'
+        info += f'话题：{self.weibo["topics"]}\n'
+        info += f'@用户：{self.weibo["at_users"]}\n'
+        info += f'url：https://m.weibo.cn/detail/{self.weibo["id"]}'
+        return info
+
+    def __str__(self) -> str:
+        """打印微博，若为转发微博，会同时打印原创和转发部分"""
+        info = ""
+        if self.retweet:
+            info += "*" * 100 + "\n"
+            info += "转发部分：\n"
+            info += f"{self.retweet.print_one_weibo()}\n"
+            info += "*" * 100 + "\n"
+            info += "原创部分：\n"
+        info += self.print_one_weibo()
+        info += "-" * 120
+        return info
+
+
+class WeiboCrawler(object):
     def __init__(self, config):
         """Weibo类初始化"""
         self.validate_config(config)
@@ -796,35 +834,6 @@ class Weibo(object):
         logger.info(self.user["description"])
         logger.info("+" * 100)
 
-    def print_one_weibo(self, weibo):
-        """打印一条微博"""
-        try:
-            logger.info("微博id：%d", weibo["id"])
-            logger.info("微博正文：%s", weibo["text"])
-            logger.info("原始图片url：%s", weibo["pics"])
-            logger.info("微博位置：%s", weibo["location"])
-            logger.info("发布时间：%s", weibo["created_at"])
-            logger.info("发布工具：%s", weibo["source"])
-            logger.info("点赞数：%d", weibo["attitudes_count"])
-            logger.info("评论数：%d", weibo["comments_count"])
-            logger.info("转发数：%d", weibo["reposts_count"])
-            logger.info("话题：%s", weibo["topics"])
-            logger.info("@用户：%s", weibo["at_users"])
-            logger.info("url：https://m.weibo.cn/detail/%d", weibo["id"])
-        except OSError:
-            pass
-
-    def print_weibo(self, weibo):
-        """打印微博，若为转发微博，会同时打印原创和转发部分"""
-        if weibo.get("retweet"):
-            logger.info("*" * 100)
-            logger.info("转发部分：")
-            self.print_one_weibo(weibo["retweet"])
-            logger.info("*" * 100)
-            logger.info("原创部分：")
-        self.print_one_weibo(weibo)
-        logger.info("-" * 120)
-
     def get_one_weibo(self, info):
         """获取一条微博的全部信息"""
         try:
@@ -1201,7 +1210,7 @@ class Weibo(object):
                                         self.user["screen_name"], wb["text"]
                                     )
                                 )
-                                # self.print_weibo(wb)
+                                # logger.info(Weibo(wb))
                             else:
                                 logger.info("正在过滤转发微博")
 
@@ -1886,7 +1895,7 @@ def get_config():
 def main():
     try:
         config = get_config()
-        wb = Weibo(config)
+        wb = WeiboCrawler(config)
         wb.start()  # 爬取微博信息
         if const.NOTIFY["NOTIFY"]:
             push_deer("更新了一次微博")
