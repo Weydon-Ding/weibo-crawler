@@ -22,12 +22,13 @@ from time import sleep
 import requests
 from lxml import etree
 from requests.adapters import HTTPAdapter
-from requests.exceptions import RequestException
 from tqdm import tqdm
 
 import const
 import util
+from database.mongodb import MongoDB
 from database.mysql import MySQL
+from database.postgresql import send_post_request_with_token
 from database.sqlite import Sqlite
 from util import csvutil
 from util.dateutil import convert_to_days_ago
@@ -118,7 +119,7 @@ class WeiboCrawler(object):
         self.headers = {"User_Agent": user_agent, "Cookie": cookie}
         self.sqlite = Sqlite()
         self.mysql = MySQL(config.get("mysql_config"))  # MySQL数据库连接配置，可以不填
-        self.mongodb_URI = config.get("mongodb_URI")  # MongoDB数据库连接字符串，可以不填
+        self.mongodb = MongoDB(config.get("mongodb_URI"), self.write_mode)  # MongoDB数据库连接字符串，可以不填
         self.post_config = config.get("post_config")  # post_config，可以不填
         user_id_list = config["user_id_list"]
         # 避免卡住
@@ -304,7 +305,7 @@ class WeiboCrawler(object):
     def user_to_mongodb(self):
         """将爬取的用户信息写入MongoDB数据库"""
         user_list = [self.user]
-        self.info_to_mongodb("user", user_list)
+        self.mongodb.insert("user", user_list)
         logger.info("%s信息写入MongoDB数据库完毕", self.user["screen_name"])
 
     def user_to_mysql(self):
@@ -1373,25 +1374,6 @@ class WeiboCrawler(object):
         logger.info("%d条微博写入json文件完毕,保存路径:", self.got_count)
         logger.info(path)
 
-    def send_post_request_with_token(self, url, data, token, max_retries, backoff_factor):
-        headers = {
-            'Content-Type': 'application/json',
-            'api-token': f'{token}',
-        }
-        for attempt in range(max_retries + 1):
-            try:
-                response = requests.post(url, json=data, headers=headers)
-                if response.status_code == requests.codes.ok:
-                    return response.json()
-                else:
-                    raise RequestException(f"Unexpected response status: {response.status_code}")
-            except RequestException as e:
-                if attempt < max_retries:
-                    sleep(backoff_factor * (attempt + 1))  # 逐步增加等待时间，避免频繁重试
-                    continue
-                else:
-                    logger.error(f"在尝试{max_retries}次发出POST连接后，请求失败：{e}")
-
     def write_post(self, wrote_count):
         """将爬到的信息通过POST发出"""
         data = {}
@@ -1403,40 +1385,14 @@ class WeiboCrawler(object):
             data['weibo'] = weibo_info
 
         if data:
-            self.send_post_request_with_token(self.post_config["api_url"], data, self.post_config["api_token"], 3, 2)
+            send_post_request_with_token(self.post_config["api_url"], data, self.post_config["api_token"], 3, 2)
             logger.info(u'%d条微博通过POST发送到 %s', len(data['weibo']), self.post_config["api_url"])
         else:
             logger.info(u'没有获取到微博，略过API POST')
 
-    def info_to_mongodb(self, collection, info_list):
-        """将爬取的信息写入MongoDB数据库"""
-        try:
-            import pymongo
-        except ImportError:
-            logger.warning("系统中可能没有安装pymongo库，请先运行 pip install pymongo ，再运行程序")
-            sys.exit()
-        try:
-            from pymongo import MongoClient
-
-            client = MongoClient(self.mongodb_URI)
-            db = client["weibo"]
-            collection = db[collection]
-            if len(self.write_mode) > 1:
-                new_info_list = copy.deepcopy(info_list)
-            else:
-                new_info_list = info_list
-            for info in new_info_list:
-                if not collection.find_one({"id": info["id"]}):
-                    collection.insert_one(info)
-                else:
-                    collection.update_one({"id": info["id"]}, {"$set": info})
-        except pymongo.errors.ServerSelectionTimeoutError:
-            logger.warning("系统中可能没有安装或启动MongoDB数据库，请先根据系统环境安装或启动MongoDB，再运行程序")
-            sys.exit()
-
     def weibo_to_mongodb(self, wrote_count):
         """将爬取的微博信息写入MongoDB数据库"""
-        self.info_to_mongodb("weibo", self.weibo[wrote_count:])
+        self.mongodb.insert("weibo", self.weibo[wrote_count:])
         logger.info("%d条微博写入MongoDB数据库完毕", self.got_count)
 
     def weibo_to_mysql(self, wrote_count):
