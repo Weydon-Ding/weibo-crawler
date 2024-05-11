@@ -378,62 +378,61 @@ class WeiboCrawler(object):
         if status_code != 200:
             logger.info("被ban了，需要等待一段时间")
             sys.exit()
-        if js["ok"]:
-            info = js["data"]["userInfo"]
-            user_info = OrderedDict()
-            user_info["id"] = self.user_config["user_id"]
-            user_info["screen_name"] = info.get("screen_name", "")
-            user_info["gender"] = info.get("gender", "")
-            params = {
-                "containerid": "230283" + str(self.user_config["user_id"]) + "_-_INFO"
-            }
-            zh_list = ["生日", "所在地", "小学", "初中", "高中", "大学", "公司", "注册时间", "阳光信用"]
-            en_list = [
-                "birthday",
-                "location",
-                "education",
-                "education",
-                "education",
-                "education",
-                "company",
-                "registration_time",
-                "sunshine",
-            ]
-            for i in en_list:
-                user_info[i] = ""
-            js, _ = self.get_json(params)
-            if js["ok"]:
-                cards = js["data"]["cards"]
-                if isinstance(cards, list) and len(cards) > 1:
-                    card_list = cards[0]["card_group"] + cards[1]["card_group"]
-                    for card in card_list:
-                        if card.get("item_name") in zh_list:
-                            user_info[
-                                en_list[zh_list.index(card.get("item_name"))]
-                            ] = card.get("item_content", "")
-            user_info["statuses_count"] = self.string_to_int(
-                info.get("statuses_count", 0)
-            )
-            user_info["followers_count"] = self.string_to_int(
-                info.get("followers_count", 0)
-            )
-            user_info["follow_count"] = self.string_to_int(info.get("follow_count", 0))
-            user_info["description"] = info.get("description", "")
-            user_info["profile_url"] = info.get("profile_url", "")
-            user_info["profile_image_url"] = info.get("profile_image_url", "")
-            user_info["avatar_hd"] = info.get("avatar_hd", "")
-            user_info["urank"] = info.get("urank", 0)
-            user_info["mbrank"] = info.get("mbrank", 0)
-            user_info["verified"] = info.get("verified", False)
-            user_info["verified_type"] = info.get("verified_type", -1)
-            user_info["verified_reason"] = info.get("verified_reason", "")
-            user = self.standardize_info(user_info)
-            self.user = user
-            self.user_to_database()
-            return 0
-        else:
+        if not js["ok"]:
             logger.info("user_id_list中 {} id出错".format(self.user_config["user_id"]))
             return -1
+        info = js["data"]["userInfo"]
+        user_info = OrderedDict()
+        user_info["id"] = self.user_config["user_id"]
+        user_info["screen_name"] = info.get("screen_name", "")
+        user_info["gender"] = info.get("gender", "")
+        params = {
+            "containerid": "230283" + str(self.user_config["user_id"]) + "_-_INFO"
+        }
+        zh_list = ["生日", "所在地", "小学", "初中", "高中", "大学", "公司", "注册时间", "阳光信用"]
+        en_list = [
+            "birthday",
+            "location",
+            "education",
+            "education",
+            "education",
+            "education",
+            "company",
+            "registration_time",
+            "sunshine",
+        ]
+        for i in en_list:
+            user_info[i] = ""
+        js, _ = self.get_json(params)
+        if js["ok"]:
+            cards = js["data"]["cards"]
+            if isinstance(cards, list) and len(cards) > 1:
+                card_list = cards[0]["card_group"] + cards[1]["card_group"]
+                for card in card_list:
+                    if card.get("item_name") in zh_list:
+                        user_info[
+                            en_list[zh_list.index(card.get("item_name"))]
+                        ] = card.get("item_content", "")
+        user_info["statuses_count"] = self.string_to_int(
+            info.get("statuses_count", 0)
+        )
+        user_info["followers_count"] = self.string_to_int(
+            info.get("followers_count", 0)
+        )
+        user_info["follow_count"] = self.string_to_int(info.get("follow_count", 0))
+        user_info["description"] = info.get("description", "")
+        user_info["profile_url"] = info.get("profile_url", "")
+        user_info["profile_image_url"] = info.get("profile_image_url", "")
+        user_info["avatar_hd"] = info.get("avatar_hd", "")
+        user_info["urank"] = info.get("urank", 0)
+        user_info["mbrank"] = info.get("mbrank", 0)
+        user_info["verified"] = info.get("verified", False)
+        user_info["verified_type"] = info.get("verified_type", -1)
+        user_info["verified_reason"] = info.get("verified_reason", "")
+        user = self.standardize_info(user_info)
+        self.user = user
+        self.user_to_database()
+        return 0
 
     def get_long_weibo(self, id):
         """获取长微博"""
@@ -1068,140 +1067,137 @@ class WeiboCrawler(object):
         """判断微博是否为置顶微博"""
         weibo_info = info["mblog"]
         isTop = weibo_info.get("isTop")
-        if isTop:
-            return True
-        else:
-            return False
+        return bool(isTop)
 
     def get_one_page(self, page):
         """获取一页的全部微博"""
         try:
             js = self.get_weibo_json(page)
-            import json
             with open('js.json','w') as f:
                 #写入方式1，等价于下面这行
                 json.dump(js,f) #把列表numbers内容写入到"list.json"文件中
-            if js["ok"]:
-                weibos = js["data"]["cards"]
+            if not js["ok"]:
+                return True
+            weibos = js["data"]["cards"]
 
-                if self.query:
-                    weibos = weibos[0]["card_group"]
-                # 如果需要检查cookie，在循环第一个人的时候，就要看看仅自己可见的信息有没有，要是没有直接报错
-                for w in weibos:
-                    if w["card_type"] == 11:
-                        temp = w.get("card_group",[0])
-                        if len(temp) >= 1:
-                            w = temp[0] or w
-                        else:
-                            w = w
-                    if w["card_type"] == 9:
-                        wb = self.get_one_weibo(w)
-                        if wb:
-                            if (
-                                const.CHECK_COOKIE["CHECK"]
-                                and (not const.CHECK_COOKIE["CHECKED"])
-                                and wb["text"].startswith(
-                                    const.CHECK_COOKIE["HIDDEN_WEIBO"]
-                                )
-                            ):
-                                const.CHECK_COOKIE["CHECKED"] = True
-                                logger.info("cookie检查通过")
-                                if const.CHECK_COOKIE["EXIT_AFTER_CHECK"]:
-                                    return True
-                            if wb["id"] in self.weibo_id_list:
-                                continue
-                            created_at = datetime.strptime(wb["created_at"], DTFORMAT)
-                            since_date = datetime.strptime(
-                                self.user_config["since_date"], DTFORMAT
+            if self.query:
+                weibos = weibos[0]["card_group"]
+            # 如果需要检查cookie，在循环第一个人的时候，就要看看仅自己可见的信息有没有，要是没有直接报错
+            for w in weibos:
+                if w["card_type"] == 11:
+                    temp = w.get("card_group",[0])
+                    if len(temp) >= 1:
+                        w = temp[0] or w
+                    else:
+                        w = w
+                if w["card_type"] == 9:
+                    wb = self.get_one_weibo(w)
+                    if wb:
+                        if (
+                            const.CHECK_COOKIE["CHECK"]
+                            and (not const.CHECK_COOKIE["CHECKED"])
+                            and wb["text"].startswith(
+                                const.CHECK_COOKIE["HIDDEN_WEIBO"]
                             )
-                            if const.MODE == "append":
-                                # append模式下不会对置顶微博做任何处理
+                        ):
+                            const.CHECK_COOKIE["CHECKED"] = True
+                            logger.info("cookie检查通过")
+                            if const.CHECK_COOKIE["EXIT_AFTER_CHECK"]:
+                                return True
+                        if wb["id"] in self.weibo_id_list:
+                            continue
+                        created_at = datetime.strptime(wb["created_at"], DTFORMAT)
+                        since_date = datetime.strptime(
+                            self.user_config["since_date"], DTFORMAT
+                        )
+                        if const.MODE == "append":
+                            # append模式下不会对置顶微博做任何处理
 
-                                # 由于微博本身的调整，下面判断是否为置顶的代码已失效，默认所有用户第一条均为置顶
-                                # if self.is_pinned_weibo(w):
-                                #     continue
-                                if const.CHECK_COOKIE["GUESS_PIN"]:
-                                    const.CHECK_COOKIE["GUESS_PIN"] = False
-                                    continue
+                            # 由于微博本身的调整，下面判断是否为置顶的代码已失效，默认所有用户第一条均为置顶
+                            # if self.is_pinned_weibo(w):
+                            #     continue
+                            if const.CHECK_COOKIE["GUESS_PIN"]:
+                                const.CHECK_COOKIE["GUESS_PIN"] = False
+                                continue
 
-                                if self.first_crawler:
-                                    # 置顶微博的具体时间不好判定，将非置顶微博当成最新微博，写入上次抓取id的csv
-                                    self.latest_weibo_id = str(wb["id"])
-                                    csvutil.update_last_weibo_id(
-                                        wb["user_id"],
-                                        str(wb["id"]) + " " + wb["created_at"],
-                                        self.user_csv_file_path,
-                                    )
-                                    self.first_crawler = False
-                                if str(wb["id"]) == self.last_weibo_id:
-                                    if const.CHECK_COOKIE["CHECK"] and (
-                                        not const.CHECK_COOKIE["CHECKED"]
-                                    ):
-                                        # 已经爬取过最新的了，只是没检查到cookie，一旦检查通过，直接放行
-                                        const.CHECK_COOKIE["EXIT_AFTER_CHECK"] = True
-                                        continue
-                                    if self.last_weibo_id == self.latest_weibo_id:
-                                        logger.info(
-                                            "{} 用户没有发新微博".format(
-                                                self.user["screen_name"]
-                                            )
-                                        )
-                                    else:
-                                        logger.info(
-                                            "增量获取微博完毕，将最新微博id从 {} 变更为 {}".format(
-                                                self.last_weibo_id, self.latest_weibo_id
-                                            )
-                                        )
-                                    return True
-                                # 上一次标记的微博被删了，就把上一条微博时间记录推前两天，多抓点评论或者微博内容修改
-                                # TODO 更加合理的流程是，即使读取到上次更新微博id，也抓取增量评论，由此获得更多的评论
-                                since_date = datetime.strptime(
-                                    convert_to_days_ago(self.last_weibo_date, 1),
-                                    DTFORMAT,
+                            if self.first_crawler:
+                                # 置顶微博的具体时间不好判定，将非置顶微博当成最新微博，写入上次抓取id的csv
+                                self.latest_weibo_id = str(wb["id"])
+                                csvutil.update_last_weibo_id(
+                                    wb["user_id"],
+                                    str(wb["id"]) + " " + wb["created_at"],
+                                    self.user_csv_file_path,
                                 )
-                            if created_at < since_date:
-                                if self.is_pinned_weibo(w):
-                                    continue
-                                # 如果要检查还没有检查cookie，不能直接跳出
-                                elif const.CHECK_COOKIE["CHECK"] and (
+                                self.first_crawler = False
+                            if str(wb["id"]) == self.last_weibo_id:
+                                if const.CHECK_COOKIE["CHECK"] and (
                                     not const.CHECK_COOKIE["CHECKED"]
                                 ):
+                                    # 已经爬取过最新的了，只是没检查到cookie，一旦检查通过，直接放行
+                                    const.CHECK_COOKIE["EXIT_AFTER_CHECK"] = True
                                     continue
-                                else:
+                                if self.last_weibo_id == self.latest_weibo_id:
                                     logger.info(
-                                        "{}已获取{}({})的第{}页{}微博{}".format(
-                                            "-" * 30,
-                                            self.user["screen_name"],
-                                            self.user["id"],
-                                            page,
-                                            '包含"' + self.query + '"的'
-                                            if self.query
-                                            else "",
-                                            "-" * 30,
+                                        "{} 用户没有发新微博".format(
+                                            self.user["screen_name"]
                                         )
                                     )
-                                    return True
-                            if (not self.only_crawl_original) or ("retweet" not in wb.keys()):
-                                self.weibo.append(wb)
-                                self.weibo_id_list.append(wb["id"])
-                                self.got_count += 1
-                                # 这里是系统日志输出，尽量别太杂
+                                else:
+                                    logger.info(
+                                        "增量获取微博完毕，将最新微博id从 {} 变更为 {}".format(
+                                            self.last_weibo_id, self.latest_weibo_id
+                                        )
+                                    )
+                                return True
+                            # 上一次标记的微博被删了，就把上一条微博时间记录推前两天，多抓点评论或者微博内容修改
+                            # TODO 更加合理的流程是，即使读取到上次更新微博id，也抓取增量评论，由此获得更多的评论
+                            since_date = datetime.strptime(
+                                convert_to_days_ago(self.last_weibo_date, 1),
+                                DTFORMAT,
+                            )
+                        if created_at < since_date:
+                            if self.is_pinned_weibo(w):
+                                continue
+                            # 如果要检查还没有检查cookie，不能直接跳出
+                            elif const.CHECK_COOKIE["CHECK"] and (
+                                not const.CHECK_COOKIE["CHECKED"]
+                            ):
+                                continue
+                            else:
                                 logger.info(
-                                    "已获取用户 {} 的微博，内容为 {}".format(
-                                        self.user["screen_name"], wb["text"]
+                                    "{}已获取{}({})的第{}页{}微博{}".format(
+                                        "-" * 30,
+                                        self.user["screen_name"],
+                                        self.user["id"],
+                                        page,
+                                        '包含"' + self.query + '"的'
+                                        if self.query
+                                        else "",
+                                        "-" * 30,
                                     )
                                 )
-                                # logger.info(Weibo(wb))
-                            else:
-                                logger.info("正在过滤转发微博")
+                                return True
 
-                if const.CHECK_COOKIE["CHECK"] and not const.CHECK_COOKIE["CHECKED"]:
-                    logger.warning("经检查，cookie无效，系统退出")
-                    if const.NOTIFY["NOTIFY"]:
-                        push_deer("经检查，cookie无效，系统退出")
-                    sys.exit()
-            else:
-                return True
+                        if self.only_crawl_original and "retweet" in wb.keys():
+                            logger.info("正在过滤转发微博")
+                        else:
+                            self.weibo.append(wb)
+                            self.weibo_id_list.append(wb["id"])
+                            self.got_count += 1
+                            # 这里是系统日志输出，尽量别太杂
+                            logger.info(
+                                "已获取用户 {} 的微博，内容为 {}".format(
+                                    self.user["screen_name"], wb["text"]
+                                )
+                            )
+                            # logger.info(Weibo(wb))
+
+            if const.CHECK_COOKIE["CHECK"] and not const.CHECK_COOKIE["CHECKED"]:
+                logger.warning("经检查，cookie无效，系统退出")
+                if const.NOTIFY["NOTIFY"]:
+                    push_deer("经检查，cookie无效，系统退出")
+                sys.exit()
+
             logger.info(
                 "{}已获取{}({})的第{}页微博{}".format(
                     "-" * 30, self.user["screen_name"], self.user["id"], page, "-" * 30
