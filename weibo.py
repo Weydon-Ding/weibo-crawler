@@ -3,7 +3,6 @@
 
 import codecs
 import copy
-import csv
 import json
 import logging
 import logging.config
@@ -26,6 +25,7 @@ from tqdm import tqdm
 
 import const
 import util
+from database.csv_helper import csv_helper
 from database.mongodb import MongoDB
 from database.mysql import MySQL
 from database.postgresql import send_post_request_with_token
@@ -46,6 +46,36 @@ logger = logging.getLogger("weibo")
 # 日期时间格式
 DTFORMAT = "%Y-%m-%dT%H:%M:%S"
 
+
+class User(object):
+    def __init__(self, user):
+        self.user = user
+
+    def print_user_info(self):
+        """打印用户信息"""
+        logger.info("+" * 100)
+        logger.info("用户信息")
+        logger.info("用户id：%s", self.user["id"])
+        logger.info("用户昵称：%s", self.user["screen_name"])
+        gender = "女" if self.user["gender"] == "f" else "男"
+        logger.info("性别：%s", gender)
+        logger.info("生日：%s", self.user["birthday"])
+        logger.info("所在地：%s", self.user["location"])
+        logger.info("教育经历：%s", self.user["education"])
+        logger.info("公司：%s", self.user["company"])
+        logger.info("阳光信用：%s", self.user["sunshine"])
+        logger.info("注册时间：%s", self.user["registration_time"])
+        logger.info("微博数：%d", self.user["statuses_count"])
+        logger.info("粉丝数：%d", self.user["followers_count"])
+        logger.info("关注数：%d", self.user["follow_count"])
+        logger.info("url：https://m.weibo.cn/profile/%s", self.user["id"])
+        if self.user.get("verified_reason"):
+            logger.info(self.user["verified_reason"])
+        logger.info(self.user["description"])
+        logger.info("+" * 100)
+
+    def __str__(self) -> str:
+        pass
 
 class Weibo(object):
     def __init__(self, weibo):
@@ -792,29 +822,6 @@ class WeiboCrawler(object):
         weibo["at_users"] = self.get_at_users(selector)
         return self.standardize_info(weibo)
 
-    def print_user_info(self):
-        """打印用户信息"""
-        logger.info("+" * 100)
-        logger.info("用户信息")
-        logger.info("用户id：%s", self.user["id"])
-        logger.info("用户昵称：%s", self.user["screen_name"])
-        gender = "女" if self.user["gender"] == "f" else "男"
-        logger.info("性别：%s", gender)
-        logger.info("生日：%s", self.user["birthday"])
-        logger.info("所在地：%s", self.user["location"])
-        logger.info("教育经历：%s", self.user["education"])
-        logger.info("公司：%s", self.user["company"])
-        logger.info("阳光信用：%s", self.user["sunshine"])
-        logger.info("注册时间：%s", self.user["registration_time"])
-        logger.info("微博数：%d", self.user["statuses_count"])
-        logger.info("粉丝数：%d", self.user["followers_count"])
-        logger.info("关注数：%d", self.user["follow_count"])
-        logger.info("url：https://m.weibo.cn/profile/%s", self.user["id"])
-        if self.user.get("verified_reason"):
-            logger.info(self.user["verified_reason"])
-        logger.info(self.user["description"])
-        logger.info("+" * 100)
-
     def get_one_weibo(self, info):
         """获取一条微博的全部信息"""
         try:
@@ -1308,28 +1315,8 @@ class WeiboCrawler(object):
         result_headers = self.get_result_headers()
         result_data = [w.values() for w in write_info]
         file_path = self.get_filepath("csv")
-        self.csv_helper(result_headers, result_data, file_path)
-
-    def csv_helper(self, headers, result_data, file_path):
-        """将指定信息写入csv文件"""
-        if not os.path.isfile(file_path):
-            is_first_write = 1
-        else:
-            is_first_write = 0
-        if sys.version < "3":  # python2.x
-            with open(file_path, "ab") as f:
-                f.write(codecs.BOM_UTF8)
-                writer = csv.writer(f)
-                if is_first_write:
-                    writer.writerows([headers])
-                writer.writerows(result_data)
-        else:  # python3.x
-            with open(file_path, "a", encoding="utf-8-sig", newline="") as f:
-                writer = csv.writer(f)
-                if is_first_write:
-                    writer.writerows([headers])
-                writer.writerows(result_data)
-        if headers[0] == "id":
+        csv_helper(result_headers, result_data, file_path)
+        if result_headers[0] == "id":
             logger.info("%d条微博写入csv文件完毕,保存路径:", self.got_count)
         else:
             logger.info("%s 信息写入csv文件完毕，保存路径:", self.user["screen_name"])
