@@ -1,0 +1,16 @@
+{
+    "python.envFile": "${workspaceFolder}/.vscode/.env",
+    "python.analysis.extraPaths": [
+        "${workspaceFolder}"
+    ],
+    "files.exclude": {
+        "**/.venv": true,
+        "**/__pycache__": true,
+        "**/artifacts": true,
+        "**/cache": true,
+        "**/distributions": true,
+        "build": true,
+        "dist": true
+    },
+    "pylint.cwd": "${workspaceFolder}",
+}

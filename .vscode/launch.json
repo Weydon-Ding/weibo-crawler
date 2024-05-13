@@ -10,7 +10,12 @@
             "request": "launch",
             "program": "weibo.py",
             "console": "integratedTerminal",
-            "justMyCode": true
+            "cwd": "${workspaceFolder}",
+            "justMyCode": true,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "args": []
         }
     ]
 }
